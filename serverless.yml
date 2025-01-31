@@ -1,0 +1,39 @@
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  environment:
+    USER_TABLE: ${self:service}-${self:provider.stage}-users
+    PROFILE_IMAGES_BUCKET: ${self:service}-${self:provider.stage}-images
+    JWT_SECRET: ${ssm:/auth/jwt-secret}
+
+functions:
+  signup:
+    handler: src/functions/signup/index.handler
+    events:
+      - http:
+          path: /signup
+          method: post
+          cors: true
+
+  login:
+    handler: src/functions/login/index.handler
+    events:
+      - http:
+          path: /login
+          method: post
+          cors: true
+
+  uploadImage:
+    handler: src/functions/uploadImage/index.handler
+    events:
+      - http:
+          path: /upload-image
+          method: post
+          cors: true
+          authorizer: aws_iam
+
+resources:
+  - ${file(resources/dynamodb-tables.yml)}
+  - ${file(resources/s3-buckets.yml)}
