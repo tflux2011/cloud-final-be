@@ -1,7 +1,8 @@
-// src/functions/uploadImage/index.js
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const { verifyToken } = require('../../middleware/auth');
+const { uploadImageSchema } = require('./schema');
+const { validateSchema } = require('../../middleware/validateSchema');
 
 const s3 = new AWS.S3();
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
@@ -11,7 +12,7 @@ const USER_TABLE = process.env.USER_TABLE;
 
 exports.handler = async (event) => {
   try {
-    // Verify authentication
+    
     const auth = await verifyToken(event);
     if (!auth.isValid) {
       return {
@@ -22,25 +23,26 @@ exports.handler = async (event) => {
       };
     }
 
-    const { email } = auth.user;
-    const { image } = JSON.parse(event.body);
-
-    if (!image) {
+    
+    const validation = validateSchema(uploadImageSchema)(event);
+    if (!validation.isValid) {
       return {
         statusCode: 400,
         body: JSON.stringify({
-          message: 'Image data is required'
+          message: 'Validation failed',
+          errors: validation.errors
         })
       };
     }
 
-    // Convert base64 to buffer
+    const { email } = auth.user;
+    const { image } = validation.data;
+
     const buffer = Buffer.from(
       image.replace(/^data:image\/\w+;base64,/, ''),
       'base64'
     );
 
-    // Generate unique filename
     const imageKey = `${uuidv4()}.jpg`;
 
     // Upload to S3
@@ -54,7 +56,6 @@ exports.handler = async (event) => {
 
     const imageUrl = `https://${PROFILE_IMAGES_BUCKET}.s3.amazonaws.com/${imageKey}`;
 
-    // Update user profile in DynamoDB
     await dynamoDB.update({
       TableName: USER_TABLE,
       Key: { email },
@@ -65,7 +66,6 @@ exports.handler = async (event) => {
       }
     }).promise();
 
-    // Get updated user data
     const result = await dynamoDB.get({
       TableName: USER_TABLE,
       Key: { email }

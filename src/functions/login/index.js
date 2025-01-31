@@ -1,7 +1,8 @@
-// src/functions/login/index.js
 const AWS = require('aws-sdk');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { loginSchema } = require('./schema');
+const { validateSchema } = require('../../middleware/validateSchema');
 
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
 const USER_TABLE = process.env.USER_TABLE;
@@ -9,19 +10,19 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 exports.handler = async (event) => {
   try {
-    const { email, password } = JSON.parse(event.body);
-
-    // Validate input
-    if (!email || !password) {
+    const validation = validateSchema(loginSchema)(event);
+    if (!validation.isValid) {
       return {
         statusCode: 400,
         body: JSON.stringify({
-          message: 'Email and password are required'
+          message: 'Validation failed',
+          errors: validation.errors
         })
       };
     }
 
-    // Get user from database
+    const { email, password } = validation.data;
+
     const result = await dynamoDB.get({
       TableName: USER_TABLE,
       Key: { email }
@@ -29,7 +30,6 @@ exports.handler = async (event) => {
 
     const user = result.Item;
 
-    // Check if user exists
     if (!user) {
       return {
         statusCode: 401,
@@ -39,7 +39,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return {
@@ -50,7 +49,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Generate JWT token
     const token = jwt.sign(
       {
         email: user.email,
@@ -60,7 +58,6 @@ exports.handler = async (event) => {
       { expiresIn: '24h' }
     );
 
-    // Return user data and token (excluding password)
     const { password: _, ...userResponse } = user;
     return {
       statusCode: 200,

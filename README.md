@@ -1,6 +1,6 @@
-# Serverless Authentication System
+# CS 516 - Final Project
 
-A serverless authentication system built with Node.js, AWS Lambda, DynamoDB, and S3 for handling user registration, authentication, and profile image management.
+This final project was built with Node.js, AWS Lambda, DynamoDB, and S3 for handling user registration, authentication, and profile image management.
 
 ## Features
 
